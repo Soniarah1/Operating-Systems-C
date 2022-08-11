@@ -1,0 +1,340 @@
+import sys
+
+IV = "is_valid"
+FN = "frame_number"
+ATS = "arrival_timestamp"
+LATS = "last_access_timestamp"
+RC = "reference_count"
+TRUE = True
+FALSE = False
+
+def process_page_access_fifo(page_table, page_number, frame_pool, current_timestamp):
+    frame = -1
+    frame_cnt = len(frame_pool)
+    table_cnt = len(page_table)
+
+    if(page_table[page_number][IV] == TRUE):
+        page_table[page_number][LATS] = current_timestamp
+        page_table[page_number][RC] = page_table[page_number][RC] + 1
+        frame = page_table[page_number][FN]
+    elif frame_cnt > 0:
+        frame = frame_pool.pop()
+        frame_cnt = frame_cnt - 1
+        page_table[page_number][ATS] = current_timestamp
+        page_table[page_number][FN] = frame
+        page_table[page_number][IV] = TRUE
+        page_table[page_number][LATS] = current_timestamp
+        page_table[page_number][RC] = 1
+
+
+    else:
+        smallest_arrival_timestamp = sys.maxsize
+        position = -1
+        for i in range(0,table_cnt):
+            if page_table[i][IV] == TRUE and page_table[i][ATS] < smallest_arrival_timestamp:
+                smallest_arrival_timestamp = page_table[i][ATS]
+                position = i
+
+        if position > -1:
+            page_table[position][ATS] = -1
+            page_table[position][IV] = FALSE
+            page_table[position][LATS] = -1
+            page_table[position][RC] = -1
+
+            page_table[page_number][FN] = page_table[position][FN]
+            page_table[position][FN] = -1
+
+            page_table[page_number][ATS] = current_timestamp
+            page_table[page_number][IV] = TRUE
+            page_table[page_number][LATS] = current_timestamp
+            page_table[page_number][RC] = 1
+
+            frame = page_table[page_number][FN]
+
+    return frame
+
+
+def count_page_faults_fifo(page_table, page_references, frame_pool):
+    faults = 0
+    frame_cnt = len(frame_pool)
+    table_cnt = len(page_table)
+    reference_count = len(page_references)
+
+    current_timestamp = 0
+    for i in range(0,table_cnt):
+        if page_table[i][ATS] > current_timestamp:
+            current_timestamp = page_table[i][ATS]
+    ++current_timestamp
+
+    for r in range(0,reference_count):
+        page_number = page_references[r]
+
+        if(page_table[page_number][IV] == TRUE):
+            page_table[page_number][LATS] = current_timestamp
+            current_timestamp = current_timestamp + 1
+            page_table[page_number][RC] = page_table[page_number][RC] + 1
+        elif frame_cnt > 0:
+            faults = faults + 1
+            frame = frame_pool.pop()
+            frame_cnt = frame_cnt - 1
+            page_table[page_number][ATS] = current_timestamp
+            page_table[page_number][FN] = frame
+            page_table[page_number][IV] = TRUE
+            page_table[page_number][LATS] = current_timestamp
+            page_table[page_number][RC] = 1
+            current_timestamp = current_timestamp + 1
+
+        else:
+            faults = faults + 1
+            smallest_arrival_timestamp = sys.maxsize
+            position = -1
+            for i in range(0,table_cnt):
+                if page_table[i][IV] == TRUE and page_table[i][ATS] < smallest_arrival_timestamp:
+                    smallest_arrival_timestamp = page_table[i][ATS]
+                    position = i
+
+            if position > -1:
+                page_table[position][ATS] = -1
+                page_table[position][IV] = FALSE
+                page_table[position][LATS] = -1
+                page_table[position][RC] = -1
+
+                page_table[page_number][FN] = page_table[position][FN]
+                page_table[position][FN] = -1
+
+                page_table[page_number][ATS] = current_timestamp
+                page_table[page_number][IV] = TRUE
+                page_table[page_number][LATS] = current_timestamp
+                page_table[page_number][RC] = 1
+                current_timestamp = current_timestamp + 1
+
+    return faults
+
+
+def process_page_access_lru(page_table, page_number, frame_pool, current_timestamp):
+    frame = -1
+    frame_cnt = len(frame_pool)
+    table_cnt = len(page_table)
+
+    if(page_table[page_number][IV] == TRUE):
+        page_table[page_number][LATS] = current_timestamp
+        page_table[page_number][RC] = page_table[page_number][RC] + 1
+        frame = page_table[page_number][FN]
+    elif frame_cnt > 0:
+        frame = frame_pool.pop()
+        frame_cnt = frame_cnt - 1
+        page_table[page_number][ATS] = current_timestamp
+        page_table[page_number][FN] = frame
+        page_table[page_number][IV] = TRUE
+        page_table[page_number][LATS] = current_timestamp
+        page_table[page_number][RC] = 1
+    else:
+        smallest_last_access_timestamp = sys.maxsize
+        position = -1
+        for i in range(0,table_cnt):
+            if page_table[i][IV] == TRUE and page_table[i][LATS] < smallest_last_access_timestamp:
+                smallest_last_access_timestamp = page_table[i][LATS]
+                position = i
+
+        if position > -1:
+            page_table[position][ATS] = -1
+            page_table[position][IV] = FALSE
+            page_table[position][LATS] = -1
+            page_table[position][RC] = -1
+
+            page_table[page_number][FN] = page_table[position][FN]
+            page_table[position][FN] = -1
+
+            page_table[page_number][ATS] = current_timestamp
+            page_table[page_number][IV] = TRUE
+            page_table[page_number][LATS] = current_timestamp
+            page_table[page_number][RC] = 1
+
+            frame = page_table[page_number][FN]
+
+    return frame
+
+
+def count_page_faults_lru(page_table, page_references, frame_pool):
+    faults = 0
+    frame_cnt = len(frame_pool)
+    table_cnt = len(page_table)
+    reference_count = len(page_references)
+
+    current_timestamp = 0
+    for i in range(0,table_cnt):
+        if page_table[i][ATS] > current_timestamp:
+            current_timestamp = page_table[i][ATS]
+    ++current_timestamp
+
+    for r in range(0,reference_count):
+        page_number = page_references[r]
+
+        if(page_table[page_number][IV] == TRUE):
+            page_table[page_number][LATS] = current_timestamp
+            current_timestamp = current_timestamp + 1
+            page_table[page_number][RC] = page_table[page_number][RC] + 1
+        elif frame_cnt > 0:
+            faults = faults + 1
+            frame = frame_pool.pop()
+            frame_cnt = frame_cnt - 1
+            page_table[page_number][ATS] = current_timestamp
+            page_table[page_number][FN] = frame
+            page_table[page_number][IV] = TRUE
+            page_table[page_number][LATS] = current_timestamp
+            page_table[page_number][RC] = 1
+            current_timestamp = current_timestamp + 1
+
+        else:
+            faults = faults + 1
+            smallest_last_access_timestamp = sys.maxsize
+            position = -1
+            for i in range(0,table_cnt):
+                if page_table[i][IV] == TRUE and page_table[i][LATS] < smallest_last_access_timestamp:
+                    smallest_last_access_timestamp = page_table[i][LATS]
+                    position = i
+
+            if position > -1:
+                page_table[position][ATS] = -1
+                page_table[position][IV] = FALSE
+                page_table[position][LATS] = -1
+                page_table[position][RC] = -1
+
+                page_table[page_number][FN] = page_table[position][FN]
+                page_table[position][FN] = -1
+
+                page_table[page_number][ATS] = current_timestamp
+                page_table[page_number][IV] = TRUE
+                page_table[page_number][LATS] = current_timestamp
+                page_table[page_number][RC] = 1
+                current_timestamp = current_timestamp + 1
+
+    return faults
+
+def process_page_access_lfu(page_table, page_number, frame_pool, current_timestamp):
+    frame = -1
+    frame_cnt = len(frame_pool)
+    table_cnt = len(page_table)
+
+    if(page_table[page_number][IV] == TRUE):
+        page_table[page_number][LATS] = current_timestamp
+        page_table[page_number][RC] = page_table[page_number][RC] + 1
+        frame = page_table[page_number][FN]
+    elif frame_cnt > 0:
+        frame = frame_pool.pop()
+        frame_cnt = frame_cnt - 1
+        page_table[page_number][ATS] = current_timestamp
+        page_table[page_number][FN] = frame
+        page_table[page_number][IV] = TRUE
+        page_table[page_number][LATS] = current_timestamp
+        page_table[page_number][RC] = 1
+    else:
+        smallest_reference_count = sys.maxsize
+        positions = []
+        position_count = 0
+        for i in range(0,table_cnt):
+            if page_table[i][IV] == TRUE:
+                if page_table[i][RC] < smallest_reference_count:
+                    position_count = 0
+                    positions.clear()
+                    smallest_reference_count = page_table[i][RC]
+                    positions.insert(position_count,i)
+                    position_count = position_count + 1
+                elif page_table[i][RC] == smallest_reference_count:
+                    positions.insert(position_count,i)
+                    position_count = position_count + 1
+
+        if position_count > 0:
+            smallest_arrival_timestamp = sys.maxsize
+            position = -1
+            for i in range(0,position_count):
+                index = positions[i]
+                if page_table[index][ATS] < smallest_arrival_timestamp:
+                    smallest_arrival_timestamp = page_table[index][ATS]
+                    position = index
+            page_table[position][ATS] = -1
+            page_table[position][IV] = FALSE
+            page_table[position][LATS] = -1
+            page_table[position][RC] = -1
+
+            page_table[page_number][FN] = page_table[position][FN]
+            page_table[position][FN] = -1
+
+            page_table[page_number][ATS] = current_timestamp
+            page_table[page_number][IV] = TRUE
+            page_table[page_number][LATS] = current_timestamp
+            page_table[page_number][RC] = 1
+
+            frame = page_table[page_number][FN]
+
+    return frame
+
+
+def count_page_faults_lfu(page_table, page_references, frame_pool):
+    faults = 0
+    frame_cnt = len(frame_pool)
+    table_cnt = len(page_table)
+    reference_count = len(page_references)
+
+    current_timestamp = 0
+    for i in range(0,table_cnt):
+        if page_table[i][ATS] > current_timestamp:
+            current_timestamp = page_table[i][ATS]
+    ++current_timestamp
+
+    for r in range(0,reference_count):
+        page_number = page_references[r]
+        if(page_table[page_number][IV] == TRUE):
+            page_table[page_number][LATS] = current_timestamp
+            current_timestamp = current_timestamp + 1
+            page_table[page_number][RC] = page_table[page_number][RC] + 1
+        elif frame_cnt > 0:
+            faults = faults + 1
+            frame = frame_pool.pop()
+            frame_cnt = frame_cnt - 1
+            page_table[page_number][ATS] = current_timestamp
+            page_table[page_number][FN] = frame
+            page_table[page_number][IV] = TRUE
+            page_table[page_number][LATS] = current_timestamp
+            page_table[page_number][RC] = 1
+            current_timestamp = current_timestamp + 1
+        else:
+            smallest_reference_count = sys.maxsize
+            positions = []
+            position_count = 0
+            for i in range(0,table_cnt):
+                if page_table[i][IV] == TRUE:
+                    if page_table[i][RC] < smallest_reference_count:
+                        position_count = 0
+                        positions.clear()
+                        smallest_reference_count = page_table[i][RC]
+                        positions.insert(position_count,i)
+                        position_count = position_count + 1
+                    elif page_table[i][RC] == smallest_reference_count:
+                        positions.insert(position_count,i)
+                        position_count = position_count + 1
+
+            if position_count > 0:
+                faults = faults + 1
+                smallest_arrival_timestamp = sys.maxsize
+                position = -1
+                for i in range(0,position_count):
+                    index = positions[i]
+                    if page_table[index][ATS] < smallest_arrival_timestamp:
+                        smallest_arrival_timestamp = page_table[index][ATS]
+                        position = index
+                page_table[position][ATS] = -1
+                page_table[position][IV] = FALSE
+                page_table[position][LATS] = -1
+                page_table[position][RC] = -1
+
+                page_table[page_number][FN] = page_table[position][FN]
+                page_table[position][FN] = -1
+
+                page_table[page_number][ATS] = current_timestamp
+                page_table[page_number][IV] = TRUE
+                page_table[page_number][LATS] = current_timestamp
+                page_table[page_number][RC] = 1
+                current_timestamp = current_timestamp + 1
+
+    return faults
